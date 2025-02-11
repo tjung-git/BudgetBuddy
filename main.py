@@ -86,6 +86,7 @@ with tab1:
         if expense_amount > 0:
             save_expense(expense_date, expense_category, expense_amount, expense_description)
             st.success("Expense added successfully!")
+            st.experimental_rerun()
         else:
             st.error("Please enter a valid amount")
 
@@ -138,6 +139,8 @@ with tab4:
         if new_category.strip():
             success, message = add_category(new_category.strip())
             st.write(message)
+            if success:
+                st.experimental_rerun()
         else:
             st.write("Please enter a category name")
 
@@ -148,6 +151,8 @@ with tab4:
         if st.button("Delete Category", type="primary"):
             success, message = delete_category(category_to_delete)
             st.write(message)
+            if success:
+                st.experimental_rerun()
 
 # Footer
 st.markdown("---")
