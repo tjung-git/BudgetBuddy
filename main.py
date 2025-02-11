@@ -30,7 +30,22 @@ with col1:
             st.rerun()
 
 # Budget Distribution Table
-st.subheader("Budget Distribution")
+col1, col2 = st.columns([3, 1])
+with col1:
+    st.subheader("Budget Distribution")
+with col2:
+    if st.button("Update All Budgets", type="primary"):
+        all_updated = True
+        for category in categories:
+            amount = st.session_state.get(f"budget_{category}", 0.0)
+            success, message = update_budget(category, amount)
+            if not success:
+                all_updated = False
+                st.error(f"Error updating {category}: {message}")
+        if all_updated:
+            st.success("All budgets updated successfully!")
+            st.rerun()
+
 categories = load_categories()
 
 total_allocated = 0.0
@@ -50,7 +65,7 @@ with col4:
 
 # Display budget rows
 for category in categories:
-    col1, col2, col3, col4, col5 = st.columns([2, 1, 1, 1, 1])
+    col1, col2, col3, col4 = st.columns([2, 1, 1, 1])
 
     with col1:
         st.write(category)
@@ -70,12 +85,6 @@ for category in categories:
         remaining = budgets_df[budgets_df['category'] == category]['remaining'].iloc[0] if not budgets_df.empty and category in budgets_df['category'].values else 0.0
         st.write(f"${remaining:.2f}")
         total_remaining += remaining
-    with col5:
-        if st.button("Update", key=f"update_{category}"):
-            success, message = update_budget(category, amount)
-            st.write(message)
-            if success:
-                st.rerun()
 
 # Display totals
 st.markdown("---")
