@@ -124,21 +124,48 @@ with tab1:
 
 # Analytics Tab
 with tab2:
-    st.header("Expense Analytics")
+    st.header("Spending Analytics")
 
-    # Category breakdown
-    category_summary = get_category_summary()
-    if not category_summary.empty:
-        fig1 = px.pie(category_summary, values='amount', names='category', 
-                      title='Spending by Category')
-        st.plotly_chart(fig1)
+    expenses_df = load_expenses()
+    if not expenses_df.empty:
+        # Convert date to datetime and extract month-year
+        expenses_df['date'] = pd.to_datetime(expenses_df['date'])
+        expenses_df['month_year'] = expenses_df['date'].dt.strftime('%Y-%m')
 
-    # Monthly trends
-    monthly_summary = get_monthly_summary()
-    if not monthly_summary.empty:
-        fig2 = px.bar(monthly_summary, x='date', y='amount', color='category',
-                      title='Monthly Spending Trends')
-        st.plotly_chart(fig2)
+        # Calculate monthly totals
+        monthly_totals = expenses_df.groupby('month_year')['amount'].sum().reset_index()
+        monthly_totals = monthly_totals.sort_values('month_year')
+
+        # Create histogram of monthly spending
+        fig = px.bar(monthly_totals, 
+                    x='month_year', 
+                    y='amount',
+                    title='Monthly Spending Distribution',
+                    labels={'month_year': 'Month', 'amount': 'Total Spent ($)'},
+                    template='plotly_white')
+
+        fig.update_layout(
+            xaxis_title="Month",
+            yaxis_title="Total Spent ($)",
+            bargap=0.2,
+            height=500
+        )
+
+        st.plotly_chart(fig, use_container_width=True)
+
+        # Display monthly statistics
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            st.metric("Average Monthly Spending", 
+                     f"${monthly_totals['amount'].mean():.2f}")
+        with col2:
+            st.metric("Highest Spending Month", 
+                     f"${monthly_totals['amount'].max():.2f}")
+        with col3:
+            st.metric("Monthly Transactions", 
+                     f"{len(expenses_df)/len(monthly_totals):.1f}")
+    else:
+        st.info("Add some expenses to see spending analytics!")
 
 # History Tab
 with tab3:
