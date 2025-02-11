@@ -25,11 +25,20 @@ def load_expenses():
     with get_db_session() as db:
         expenses = db.query(Expense).all()
         return pd.DataFrame([{
+            'expense_id': expense.id,  # Add expense ID to the DataFrame
             'date': expense.date,
             'category': expense.category.category,
             'amount': expense.amount,
             'description': expense.description
         } for expense in expenses])
+
+def delete_expense(expense_id):
+    with get_db_session() as db:
+        expense = db.query(Expense).filter(Expense.id == expense_id).first()
+        if expense:
+            db.delete(expense)
+            return True, "Expense deleted successfully"
+        return False, "Expense not found"
 
 def save_expense(date, category, amount, description):
     with get_db_session() as db:

@@ -146,7 +146,36 @@ with tab3:
     expenses_df = load_expenses()
     if not expenses_df.empty:
         expenses_df['date'] = pd.to_datetime(expenses_df['date']).dt.date
-        st.dataframe(expenses_df.sort_values('date', ascending=False), use_container_width=True)
+
+        # Create columns for the table header
+        cols = st.columns([2, 2, 1, 3, 1])
+        cols[0].markdown("**Date**")
+        cols[1].markdown("**Category**")
+        cols[2].markdown("**Amount**")
+        cols[3].markdown("**Description**")
+        cols[4].markdown("**Actions**")
+
+        # Display each expense row with a delete button
+        for index, row in expenses_df.sort_values('date', ascending=False).iterrows():
+            cols = st.columns([2, 2, 1, 3, 1])
+            cols[0].write(row['date'])
+            cols[1].write(row['category'])
+            cols[2].write(f"${row['amount']:.2f}")
+            cols[3].write(row['description'])
+
+            # Delete button with confirmation
+            if cols[4].button("🗑️", key=f"delete_{row['expense_id']}", 
+                            help="Delete this expense"):
+                if st.session_state.get(f"confirm_delete_{row['expense_id']}", False):
+                    success, message = delete_expense(row['expense_id'])
+                    if success:
+                        st.success("Expense deleted successfully!")
+                        st.rerun()
+                    else:
+                        st.error(message)
+                else:
+                    st.session_state[f"confirm_delete_{row['expense_id']}"] = True
+                    st.warning(f"Are you sure you want to delete this expense? Click the delete button again to confirm.")
     else:
         st.write("No expenses recorded yet!")
 
