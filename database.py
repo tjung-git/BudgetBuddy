@@ -7,8 +7,17 @@ from datetime import datetime
 # Get database URL from environment variable
 DATABASE_URL = os.getenv("DATABASE_URL")
 
-# Create database engine
-engine = create_engine(DATABASE_URL)
+# Create database engine with proper SSL configuration
+engine = create_engine(
+    DATABASE_URL,
+    pool_pre_ping=True,  # Enable connection health checks
+    pool_recycle=3600,   # Recycle connections every hour
+    connect_args={
+        "sslmode": "require"  # Force SSL connection
+    }
+)
+
+# Configure session with proper handling
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 # Create declarative base
@@ -19,8 +28,8 @@ class Category(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     category = Column(String, unique=True, nullable=False)
-    expenses = relationship("Expense", back_populates="category")
-    budget = relationship("Budget", back_populates="category", uselist=False)
+    expenses = relationship("Expense", back_populates="category", cascade="all, delete-orphan")
+    budget = relationship("Budget", back_populates="category", uselist=False, cascade="all, delete-orphan")
 
 class Expense(Base):
     __tablename__ = "expenses"
@@ -29,14 +38,14 @@ class Expense(Base):
     date = Column(Date, nullable=False, default=datetime.now().date())
     amount = Column(Float, nullable=False)
     description = Column(String)
-    category_id = Column(Integer, ForeignKey("categories.id"), nullable=False)
+    category_id = Column(Integer, ForeignKey("categories.id", ondelete="CASCADE"), nullable=False)
     category = relationship("Category", back_populates="expenses")
 
 class Budget(Base):
     __tablename__ = "budgets"
 
     id = Column(Integer, primary_key=True, index=True)
-    category_id = Column(Integer, ForeignKey("categories.id"), unique=True, nullable=False)
+    category_id = Column(Integer, ForeignKey("categories.id", ondelete="CASCADE"), unique=True, nullable=False)
     amount = Column(Float, nullable=False, default=0.0)
     notes = Column(String)
     category = relationship("Category", back_populates="budget")
@@ -46,6 +55,14 @@ class Settings(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     total_budget = Column(Float, nullable=False, default=0.0)
+
+# Database session context manager
+def get_db():
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
 
 # Create all tables
 Base.metadata.create_all(bind=engine)

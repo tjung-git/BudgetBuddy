@@ -26,6 +26,8 @@ with col1:
     if st.button("Update Total Budget"):
         success, message = update_total_budget(total_budget)
         st.write(message)
+        if success:
+            st.rerun()
 
 # Budget Distribution Table
 st.subheader("Budget Distribution")
@@ -53,6 +55,8 @@ for category in categories:
         if st.button("Update", key=f"update_{category}"):
             success, message = update_budget(category, amount, notes)
             st.write(message)
+            if success:
+                st.rerun()
 
     budget_data.append({"Category": category, "Amount": amount, "Notes": notes})
 
@@ -86,7 +90,7 @@ with tab1:
         if expense_amount > 0:
             save_expense(expense_date, expense_category, expense_amount, expense_description)
             st.success("Expense added successfully!")
-            st.experimental_rerun()
+            st.rerun()
         else:
             st.error("Please enter a valid amount")
 
@@ -140,7 +144,7 @@ with tab4:
             success, message = add_category(new_category.strip())
             st.write(message)
             if success:
-                st.experimental_rerun()
+                st.rerun()
         else:
             st.write("Please enter a category name")
 
@@ -152,7 +156,7 @@ with tab4:
             success, message = delete_category(category_to_delete)
             st.write(message)
             if success:
-                st.experimental_rerun()
+                st.rerun()
 
 # Footer
 st.markdown("---")
