@@ -47,7 +47,6 @@ class Budget(Base):
     id = Column(Integer, primary_key=True, index=True)
     category_id = Column(Integer, ForeignKey("categories.id", ondelete="CASCADE"), unique=True, nullable=False)
     amount = Column(Float, nullable=False, default=0.0)
-    notes = Column(String)
     category = relationship("Category", back_populates="budget")
 
 class Settings(Base):
@@ -70,7 +69,7 @@ Base.metadata.create_all(bind=engine)
 # Initialize default categories if they don't exist
 def init_categories():
     db = SessionLocal()
-    default_categories = ["Groceries", "Transportation", "Entertainment", "Bills", "Shopping"]
+    default_categories = ["Food & Groceries", "Dining Out", "Credit Card Debt", "Emergency Fund", "Miscellaneous", "Fixed Bills"]
 
     try:
         existing_categories = db.query(Category).all()

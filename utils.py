@@ -69,6 +69,66 @@ def delete_category(category):
         db.delete(category_obj)
         return True, "Category deleted successfully"
 
+def calculate_category_expenses():
+    expenses_df = load_expenses()
+    if len(expenses_df) == 0:
+        return pd.DataFrame(columns=['category', 'spent'])
+    return expenses_df.groupby('category')['amount'].sum().reset_index().rename(columns={'amount': 'spent'})
+
+def get_budget_data():
+    with get_db_session() as db:
+        budgets = db.query(Budget, Category).join(Category).all()
+        settings = db.query(Settings).first()
+
+        if not settings:
+            settings = Settings(total_budget=0.0)
+            db.add(settings)
+
+        # Get expenses by category
+        expenses_by_category = calculate_category_expenses()
+
+        budget_data = []
+        for budget, cat in budgets:
+            spent = expenses_by_category[
+                expenses_by_category['category'] == cat.category
+            ]['spent'].iloc[0] if not expenses_by_category.empty and cat.category in expenses_by_category['category'].values else 0.0
+
+            remaining = budget.amount - spent
+
+            budget_data.append({
+                'category': cat.category,
+                'amount': budget.amount,
+                'spent': spent,
+                'remaining': remaining
+            })
+
+        return pd.DataFrame(budget_data), settings.total_budget
+
+def update_budget(category, amount):
+    with get_db_session() as db:
+        category_obj = db.query(Category).filter(Category.category == category).first()
+        if not category_obj:
+            return False, "Category not found"
+
+        budget = db.query(Budget).filter(Budget.category_id == category_obj.id).first()
+        if budget:
+            budget.amount = amount
+        else:
+            budget = Budget(category_id=category_obj.id, amount=amount)
+            db.add(budget)
+
+        return True, "Budget updated successfully"
+
+def update_total_budget(amount):
+    with get_db_session() as db:
+        settings = db.query(Settings).first()
+        if not settings:
+            settings = Settings(total_budget=amount)
+            db.add(settings)
+        else:
+            settings.total_budget = amount
+        return True, "Total budget updated successfully"
+
 def get_monthly_summary():
     with get_db_session() as db:
         expenses = load_expenses()
@@ -86,44 +146,3 @@ def get_category_summary():
             return pd.DataFrame()
 
         return expenses.groupby('category')['amount'].sum().reset_index()
-
-def get_budget_data():
-    with get_db_session() as db:
-        budgets = db.query(Budget, Category).join(Category).all()
-        settings = db.query(Settings).first()
-
-        if not settings:
-            settings = Settings(total_budget=0.0)
-            db.add(settings)
-
-        return pd.DataFrame([{
-            'category': cat.category,
-            'amount': budget.amount,
-            'notes': budget.notes
-        } for budget, cat in budgets]), settings.total_budget
-
-def update_budget(category, amount, notes=""):
-    with get_db_session() as db:
-        category_obj = db.query(Category).filter(Category.category == category).first()
-        if not category_obj:
-            return False, "Category not found"
-
-        budget = db.query(Budget).filter(Budget.category_id == category_obj.id).first()
-        if budget:
-            budget.amount = amount
-            budget.notes = notes
-        else:
-            budget = Budget(category_id=category_obj.id, amount=amount, notes=notes)
-            db.add(budget)
-
-        return True, "Budget updated successfully"
-
-def update_total_budget(amount):
-    with get_db_session() as db:
-        settings = db.query(Settings).first()
-        if not settings:
-            settings = Settings(total_budget=amount)
-            db.add(settings)
-        else:
-            settings.total_budget = amount
-        return True, "Total budget updated successfully"

@@ -18,10 +18,10 @@ col1, col2 = st.columns([2, 1])
 with col1:
     budgets_df, current_total = get_budget_data()
     total_budget = st.number_input("Enter your biweekly income", 
-                                 min_value=0.0, 
-                                 value=float(current_total),
-                                 step=100.0,
-                                 format="%.2f")
+                                min_value=0.0, 
+                                value=float(current_total),
+                                step=100.0,
+                                format="%.2f")
 
     if st.button("Update Total Budget"):
         success, message = update_total_budget(total_budget)
@@ -33,11 +33,25 @@ with col1:
 st.subheader("Budget Distribution")
 categories = load_categories()
 
-budget_data = []
 total_allocated = 0.0
+total_spent = 0.0
+total_remaining = 0.0
 
+# Create a table header
+col1, col2, col3, col4 = st.columns([2, 1, 1, 1])
+with col1:
+    st.markdown("**Category**")
+with col2:
+    st.markdown("**Budget Amount**")
+with col3:
+    st.markdown("**Spent**")
+with col4:
+    st.markdown("**Remaining**")
+
+# Display budget rows
 for category in categories:
-    col1, col2, col3 = st.columns([2, 1, 2])
+    col1, col2, col3, col4, col5 = st.columns([2, 1, 1, 1, 1])
+
     with col1:
         st.write(category)
     with col2:
@@ -49,26 +63,31 @@ for category in categories:
                                key=f"budget_{category}")
         total_allocated += amount
     with col3:
-        notes = st.text_input("Notes (optional)", 
-                            value=budgets_df[budgets_df['category'] == category]['notes'].iloc[0] if not budgets_df.empty and category in budgets_df['category'].values else "",
-                            key=f"notes_{category}")
+        spent = budgets_df[budgets_df['category'] == category]['spent'].iloc[0] if not budgets_df.empty and category in budgets_df['category'].values else 0.0
+        st.write(f"${spent:.2f}")
+        total_spent += spent
+    with col4:
+        remaining = budgets_df[budgets_df['category'] == category]['remaining'].iloc[0] if not budgets_df.empty and category in budgets_df['category'].values else 0.0
+        st.write(f"${remaining:.2f}")
+        total_remaining += remaining
+    with col5:
         if st.button("Update", key=f"update_{category}"):
-            success, message = update_budget(category, amount, notes)
+            success, message = update_budget(category, amount)
             st.write(message)
             if success:
                 st.rerun()
 
-    budget_data.append({"Category": category, "Amount": amount, "Notes": notes})
-
-# Display total allocated and remaining
+# Display totals
 st.markdown("---")
-col1, col2, col3 = st.columns(3)
+col1, col2, col3, col4 = st.columns(4)
 with col1:
     st.metric("Total Budget", f"${total_budget:.2f}")
 with col2:
     st.metric("Total Allocated", f"${total_allocated:.2f}")
 with col3:
-    st.metric("Remaining", f"${(total_budget - total_allocated):.2f}")
+    st.metric("Total Spent", f"${total_spent:.2f}")
+with col4:
+    st.metric("Total Remaining", f"${total_remaining:.2f}")
 
 st.markdown("---")
 
@@ -112,17 +131,6 @@ with tab2:
                       title='Monthly Spending Trends')
         st.plotly_chart(fig2)
 
-    # Basic statistics
-    expenses_df = load_expenses()
-    if not expenses_df.empty:
-        col1, col2, col3 = st.columns(3)
-        with col1:
-            st.metric("Total Expenses", f"${expenses_df['amount'].sum():.2f}")
-        with col2:
-            st.metric("Average Expense", f"${expenses_df['amount'].mean():.2f}")
-        with col3:
-            st.metric("Number of Transactions", len(expenses_df))
-
 # History Tab
 with tab3:
     st.header("Expense History")
@@ -138,19 +146,20 @@ with tab4:
     st.header("Category Management")
 
     # Add new category
-    new_category = st.text_input("Add New Category")
-    if st.button("Add Category"):
-        if new_category.strip():
-            success, message = add_category(new_category.strip())
-            st.write(message)
-            if success:
-                st.rerun()
-        else:
-            st.write("Please enter a category name")
+    with st.expander("Add New Category"):
+        new_category = st.text_input("Add New Category")
+        if st.button("Add Category"):
+            if new_category.strip():
+                success, message = add_category(new_category.strip())
+                st.write(message)
+                if success:
+                    st.rerun()
+            else:
+                st.write("Please enter a category name")
 
-    # Delete category (in expandable section)
+    # Delete category (in danger zone)
     with st.expander("⚠️ Danger Zone - Delete Category"):
-        st.warning("Warning: Deleting a category cannot be undone!")
+        st.warning("Warning: Deleting a category will remove all associated expenses and budget data!")
         category_to_delete = st.selectbox("Select category to delete", categories)
         if st.button("Delete Category", type="primary"):
             success, message = delete_category(category_to_delete)
