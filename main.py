@@ -128,42 +128,45 @@ with tab2:
 
     expenses_df = load_expenses()
     if not expenses_df.empty:
-        # Convert date to datetime and extract month-year
+        # Convert date to datetime and extract week information
         expenses_df['date'] = pd.to_datetime(expenses_df['date'])
-        expenses_df['month_year'] = expenses_df['date'].dt.strftime('%Y-%m')
+        expenses_df['week'] = expenses_df['date'].dt.strftime('%Y-W%V')  # ISO week numbering
 
-        # Calculate monthly totals
-        monthly_totals = expenses_df.groupby('month_year')['amount'].sum().reset_index()
-        monthly_totals = monthly_totals.sort_values('month_year')
+        # Calculate weekly totals
+        weekly_totals = expenses_df.groupby('week')['amount'].sum().reset_index()
+        weekly_totals = weekly_totals.sort_values('week')
 
-        # Create histogram of monthly spending
-        fig = px.bar(monthly_totals, 
-                    x='month_year', 
+        # Create histogram of weekly spending
+        fig = px.bar(weekly_totals, 
+                    x='week', 
                     y='amount',
-                    title='Monthly Spending Distribution',
-                    labels={'month_year': 'Month', 'amount': 'Total Spent ($)'},
+                    title='Weekly Spending Distribution',
+                    labels={'week': 'Week', 'amount': 'Total Spent ($)'},
                     template='plotly_white')
 
         fig.update_layout(
-            xaxis_title="Month",
+            xaxis_title="Week",
             yaxis_title="Total Spent ($)",
             bargap=0.2,
             height=500
         )
 
+        # Rotate x-axis labels for better readability
+        fig.update_xaxes(tickangle=45)
+
         st.plotly_chart(fig, use_container_width=True)
 
-        # Display monthly statistics
+        # Display weekly statistics
         col1, col2, col3 = st.columns(3)
         with col1:
-            st.metric("Average Monthly Spending", 
-                     f"${monthly_totals['amount'].mean():.2f}")
+            st.metric("Average Weekly Spending", 
+                     f"${weekly_totals['amount'].mean():.2f}")
         with col2:
-            st.metric("Highest Spending Month", 
-                     f"${monthly_totals['amount'].max():.2f}")
+            st.metric("Highest Spending Week", 
+                     f"${weekly_totals['amount'].max():.2f}")
         with col3:
-            st.metric("Monthly Transactions", 
-                     f"{len(expenses_df)/len(monthly_totals):.1f}")
+            st.metric("Weekly Transactions", 
+                     f"{len(expenses_df)/len(weekly_totals):.1f}")
     else:
         st.info("Add some expenses to see spending analytics!")
 
