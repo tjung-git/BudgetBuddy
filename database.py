@@ -16,20 +16,36 @@ Base = declarative_base()
 
 class Category(Base):
     __tablename__ = "categories"
-    
+
     id = Column(Integer, primary_key=True, index=True)
     category = Column(String, unique=True, nullable=False)
     expenses = relationship("Expense", back_populates="category")
+    budget = relationship("Budget", back_populates="category", uselist=False)
 
 class Expense(Base):
     __tablename__ = "expenses"
-    
+
     id = Column(Integer, primary_key=True, index=True)
     date = Column(Date, nullable=False, default=datetime.now().date())
     amount = Column(Float, nullable=False)
     description = Column(String)
     category_id = Column(Integer, ForeignKey("categories.id"), nullable=False)
     category = relationship("Category", back_populates="expenses")
+
+class Budget(Base):
+    __tablename__ = "budgets"
+
+    id = Column(Integer, primary_key=True, index=True)
+    category_id = Column(Integer, ForeignKey("categories.id"), unique=True, nullable=False)
+    amount = Column(Float, nullable=False, default=0.0)
+    notes = Column(String)
+    category = relationship("Category", back_populates="budget")
+
+class Settings(Base):
+    __tablename__ = "settings"
+
+    id = Column(Integer, primary_key=True, index=True)
+    total_budget = Column(Float, nullable=False, default=0.0)
 
 # Create all tables
 Base.metadata.create_all(bind=engine)
@@ -38,13 +54,18 @@ Base.metadata.create_all(bind=engine)
 def init_categories():
     db = SessionLocal()
     default_categories = ["Groceries", "Transportation", "Entertainment", "Bills", "Shopping"]
-    
+
     try:
         existing_categories = db.query(Category).all()
         if not existing_categories:
             for category_name in default_categories:
                 category = Category(category=category_name)
                 db.add(category)
+            db.commit()
+
+            # Initialize settings with default total budget
+            settings = Settings(total_budget=0.0)
+            db.add(settings)
             db.commit()
     except Exception as e:
         db.rollback()
