@@ -1,77 +1,110 @@
 import pandas as pd
 from datetime import datetime
-import os
-
-# Ensure data directory exists
-os.makedirs('data', exist_ok=True)
-
-# Initialize CSV files if they don't exist
-def init_files():
-    if not os.path.exists('data/categories.csv'):
-        default_categories = pd.DataFrame({
-            'category': ['Groceries', 'Transportation', 'Entertainment', 'Bills', 'Shopping']
-        })
-        default_categories.to_csv('data/categories.csv', index=False)
-    
-    if not os.path.exists('data/expenses.csv'):
-        expenses_df = pd.DataFrame(columns=['date', 'category', 'amount', 'description'])
-        expenses_df.to_csv('data/expenses.csv', index=False)
+from database import SessionLocal, Category, Expense
+from sqlalchemy import func
 
 def load_categories():
-    return pd.read_csv('data/categories.csv')['category'].tolist()
+    db = SessionLocal()
+    try:
+        categories = db.query(Category).all()
+        return [cat.category for cat in categories]
+    finally:
+        db.close()
 
 def load_expenses():
-    return pd.read_csv('data/expenses.csv')
+    db = SessionLocal()
+    try:
+        expenses = db.query(Expense).all()
+        return pd.DataFrame([{
+            'date': expense.date,
+            'category': expense.category.category,
+            'amount': expense.amount,
+            'description': expense.description
+        } for expense in expenses])
+    finally:
+        db.close()
 
 def save_expense(date, category, amount, description):
-    expenses_df = load_expenses()
-    new_expense = pd.DataFrame({
-        'date': [date],
-        'category': [category],
-        'amount': [amount],
-        'description': [description]
-    })
-    expenses_df = pd.concat([expenses_df, new_expense], ignore_index=True)
-    expenses_df.to_csv('data/expenses.csv', index=False)
+    db = SessionLocal()
+    try:
+        category_obj = db.query(Category).filter(Category.category == category).first()
+        new_expense = Expense(
+            date=date,
+            category_id=category_obj.id,
+            amount=amount,
+            description=description
+        )
+        db.add(new_expense)
+        db.commit()
+    except Exception as e:
+        db.rollback()
+        raise e
+    finally:
+        db.close()
 
 def add_category(category):
-    categories = load_categories()
-    if len(categories) >= 20:
-        return False, "Maximum number of categories (20) reached"
-    if category in categories:
-        return False, "Category already exists"
-    
-    categories_df = pd.read_csv('data/categories.csv')
-    new_category = pd.DataFrame({'category': [category]})
-    categories_df = pd.concat([categories_df, new_category], ignore_index=True)
-    categories_df.to_csv('data/categories.csv', index=False)
-    return True, "Category added successfully"
+    db = SessionLocal()
+    try:
+        # Check category limit
+        if db.query(Category).count() >= 20:
+            return False, "Maximum number of categories (20) reached"
+
+        # Check if category exists
+        if db.query(Category).filter(Category.category == category).first():
+            return False, "Category already exists"
+
+        new_category = Category(category=category)
+        db.add(new_category)
+        db.commit()
+        return True, "Category added successfully"
+    except Exception as e:
+        db.rollback()
+        return False, str(e)
+    finally:
+        db.close()
 
 def delete_category(category):
-    categories_df = pd.read_csv('data/categories.csv')
-    if len(categories_df) <= 1:
-        return False, "Cannot delete the last category"
-    
-    expenses_df = load_expenses()
-    if len(expenses_df[expenses_df['category'] == category]) > 0:
-        return False, "Cannot delete category with existing expenses"
-    
-    categories_df = categories_df[categories_df['category'] != category]
-    categories_df.to_csv('data/categories.csv', index=False)
-    return True, "Category deleted successfully"
+    db = SessionLocal()
+    try:
+        # Check if it's the last category
+        if db.query(Category).count() <= 1:
+            return False, "Cannot delete the last category"
+
+        category_obj = db.query(Category).filter(Category.category == category).first()
+
+        # Check if category has expenses
+        if db.query(Expense).filter(Expense.category_id == category_obj.id).count() > 0:
+            return False, "Cannot delete category with existing expenses"
+
+        db.delete(category_obj)
+        db.commit()
+        return True, "Category deleted successfully"
+    except Exception as e:
+        db.rollback()
+        return False, str(e)
+    finally:
+        db.close()
 
 def get_monthly_summary():
-    expenses_df = load_expenses()
-    if len(expenses_df) == 0:
-        return pd.DataFrame()
-    
-    expenses_df['date'] = pd.to_datetime(expenses_df['date'])
-    monthly = expenses_df.groupby([expenses_df['date'].dt.strftime('%Y-%m'), 'category'])['amount'].sum().reset_index()
-    return monthly
+    db = SessionLocal()
+    try:
+        expenses = load_expenses()
+        if len(expenses) == 0:
+            return pd.DataFrame()
+
+        expenses['date'] = pd.to_datetime(expenses['date'])
+        monthly = expenses.groupby([expenses['date'].dt.strftime('%Y-%m'), 'category'])['amount'].sum().reset_index()
+        return monthly
+    finally:
+        db.close()
 
 def get_category_summary():
-    expenses_df = load_expenses()
-    if len(expenses_df) == 0:
-        return pd.DataFrame()
-    
-    return expenses_df.groupby('category')['amount'].sum().reset_index()
+    db = SessionLocal()
+    try:
+        expenses = load_expenses()
+        if len(expenses) == 0:
+            return pd.DataFrame()
+
+        return expenses.groupby('category')['amount'].sum().reset_index()
+    finally:
+        db.close()
